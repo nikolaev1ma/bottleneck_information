@@ -9,6 +9,8 @@ from torch import optim
 import torchvision
 import numpy as np
 from scipy.stats import multivariate_normal
+from collections import Counter
+
 
 
 def normal_p(X, input):
@@ -22,6 +24,68 @@ def normal_p(X, input):
     pX = np.sqrt(pX)
     pX /= pX.sum()
     return pX
+
+
+def get_digitize_hidden(hidden):
+    hidden_mins = np.quantile(hidden, 0.01, axis=0)
+    hidden_maxs = np.quantile(hidden, 0.99, axis=0)
+    bins = np.linspace(hidden_mins, hidden_maxs, num=30)
+    indexes = np.zeros((hidden.shape[0], hidden.shape[1]))
+    for i in range(hidden.shape[1]):
+        indexes[:, i] = np.digitize(hidden[:, i], bins[:, i])
+    return indexes
+
+
+
+def get_digirize_x(X):
+    X_mins = 0.
+    X_maxs = 1.
+    bins = np.linspace(X_mins, X_maxs, num=5)
+    indexes = np.digitize(X, bins)
+    return indexes
+
+
+
+def calc_pdfs(hidden, x, y):
+    hidden_indexes = get_digitize_hidden(hidden)
+    x_indexes = get_digirize_x(x)
+    print(hidden_indexes.shape)
+    print(x_indexes.shape)
+    pdf_x = Counter()
+    pdf_y = Counter()
+    pdf_t = Counter()
+    pdf_xt = Counter()
+    pdf_yt = Counter()
+    samples = hidden.shape[0]
+
+    for i in range(samples):
+        pdf_x[tuple(x_indexes[i, :])] += 1 / float(samples)
+        pdf_y[y[i]] += 1 / float(samples)
+        pdf_xt[tuple(x_indexes[i, :]) + tuple(hidden_indexes[i, :])] += 1 / float(samples)
+        pdf_yt[(y[i], ) + tuple(hidden_indexes[i, :])] += 1 / float(samples)
+        pdf_t[tuple(hidden_indexes[i, :])] += 1 / float(samples)
+    return pdf_x, pdf_y, pdf_xt, pdf_yt, pdf_t
+    '''
+    mi_xt = 0
+    for i in pdf_xt:
+        # P(x,t), P(x) and P(t)
+        p_xt = pdf_xt[i];
+        p_x = pdf_x[i[:x.shape[1]]]
+        p_t = pdf_t[i[x.shape[1]:]]
+        # I(X;T)
+        mi_xt += p_xt * np.log(p_xt / p_x / p_t)
+
+    mi_ty = 0
+    for i in pdf_yt:
+        # P(t,y), P(t) and P(y)
+        p_yt = pdf_yt[i];
+        p_t = pdf_t[i[1:]];
+        p_y = pdf_y[i[0]]
+        # I(X;T)
+        mi_ty += p_yt * np.log(p_yt / p_t / p_y)
+
+    return mi_xt, mi_ty
+    '''
 
 
 def entropy(p, q):
@@ -64,9 +128,50 @@ class CNN(nn.Module):
         z1 = self.conv1(x)
         z2 = self.conv2(z1)
         # flatten the output of conv2 to (batch_size, 32 * 7 * 7)
-        z2 = z2.view(z2.size(0), -1)
-        z3 = self.out(z2)
+        z2_view = z2.view(z2.size(0), -1)
+        z3 = self.out(z2_view)
         return z1, z2, z3
+
+    def forward_compressed(self, x, version):
+        z1 = self.conv1(x)
+        z2 = self.conv2(z1)
+        # flatten the output of conv2 to (batch_size, 32 * 7 * 7)
+        z2_view = z2.view(z2.size(0), -1)
+        z3 = self.out(z2_view)
+        if version == 'v1':
+            avg_pool2d_input = nn.MaxPool2d((4, 4))
+            avg_pool3d_z1 = nn.MaxPool3d((1, 4, 4))
+            avg_pool3d_z2 = nn.MaxPool3d((1, 3, 3))
+            sm_z3 = nn.Softmax()
+        if version == 'v2':
+            avg_pool2d_input = nn.MaxPool2d((4, 4))
+            avg_pool3d_z1 = nn.MaxPool3d((2, 4, 4))
+            avg_pool3d_z2 = nn.MaxPool3d((2, 3, 3))
+            sm_z3 = nn.Softmax()
+        if version == 'v3':
+            avg_pool2d_input = nn.MaxPool2d((4, 4))
+            avg_pool3d_z1 = nn.MaxPool3d((4, 4, 4))
+            avg_pool3d_z2 = nn.MaxPool3d((4, 3, 3))
+            sm_z3 = nn.Softmax()
+        if version == 'v4':
+            avg_pool2d_input = nn.MaxPool2d((4, 4))
+            avg_pool3d_z1 = nn.MaxPool3d((1, 7, 7))
+            avg_pool3d_z2 = nn.MaxPool3d((1, 7, 7))
+            sm_z3 = nn.Softmax()
+        if version == 'v5':
+            avg_pool2d_input = nn.MaxPool2d((4, 4))
+            avg_pool3d_z1 = nn.AvgPool3d((1, 7, 7))
+            avg_pool3d_z2 = nn.AvgPool3d((1, 7, 7))
+            sm_z3 = nn.Softmax()
+        x_comp = avg_pool2d_input(x)
+        z1_comp = avg_pool3d_z1(z1)
+        z2_comp = avg_pool3d_z2(z2)
+        z3_comp = sm_z3(z3)
+        return x_comp, z1_comp, z2_comp, z3_comp
+
+
+
+
 
 
 class Probability:
@@ -160,6 +265,26 @@ class Probability:
         self.I_yz2.append(Iyz2)
         self.I_yz3.append(Iyz3)
 
+    def get_pdfs(self, epoch):
+        x = self.X.reshape(self.X.shape[0], -1)
+        y = self.Y
+        z1 = self.Z1.reshape(self.Z1.shape[0], -1)
+        z2 = self.Z2.reshape(self.Z2.shape[0], -1)
+        z3 = self.Z3.reshape(self.Z3.shape[0], -1)
+
+        return calc_pdfs(z1, x, y)
+
+    def get_mult(self, epoch):
+        x = self.X.reshape(self.X.shape[0], -1)
+        y = self.Y
+        z1 = self.Z1.reshape(self.Z1.shape[0], -1)
+        z2 = self.Z2.reshape(self.Z2.shape[0], -1)
+        z3 = self.Z3.reshape(self.Z3.shape[0], -1)
+        mi_xz1, mi_z1y = calc_mult_inf(z1, x, y)
+        mi_xz2, mi_z2y = calc_mult_inf(z2, x, y)
+        mi_xz3, mi_z3y = calc_mult_inf(z3, x, y)
+        np.savez(f'data/{epoch}', [mi_xz1, mi_z1y, mi_xz2, mi_z2y, mi_xz3, mi_z3y])
+
 
     def get_X_Y_Z(self):
         X_array = []
@@ -210,6 +335,15 @@ class Probability:
         self.get_pZY()
         print("-------get all prob-------")
         self.get_Inf()
+        print("-------get entropy--------")
+
+    def step_v1(self, epoch, is_first=True):
+        if is_first:
+            self.get_X_Y_Z()
+        else:
+            self.get_Z()
+        print("-------get all prob-------")
+        return self.get_pdfs(epoch)
         print("-------get entropy--------")
 
 

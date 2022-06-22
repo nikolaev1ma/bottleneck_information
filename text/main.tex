@@ -1,0 +1,91 @@
+\include{style}
+
+\renewcommand*{\maketitle}{
+\begin{titlepage}
+  \begin{center}
+    \linespread{1}
+    \small
+    Федеральное государственное автономное образовательное учреждение\break высшего образования\par
+    <<Московский физико-технический институт \break (национальный исследовательский университет)>>\par
+    Физтех-школа Прикладной Математики и Информатики\par
+    Кафедра корпоративных информационных систем\par
+  \end{center}
+%
+  {
+    \small
+    {\bf Направление подготовки / специальность}: 01.03.02 Прикладная математика и информатика\newline
+    {\bf Направленность (профиль) подготовки}: Прикладная математика и компьютерные науки
+  }
+%
+  {
+    \topskip0pt
+    \vspace*{\fill}
+    \begin{center}
+      {\bf\Large ИССЛЕДОВАНИЕ ИНФОРМАЦИОННОГО БЫТЫЛОЧНОГО ГОРЛЫШКА В НЕЙРОННЫХ СЕТЯХ}\par
+      (бакалаврская работа)
+    \end{center}
+    \vspace*{\fill}
+  }
+%
+  \hfill
+  \begin{minipage}[t]{8cm}
+    {\bf Студент: \newline}
+    Николаев Михаил Алексеевич\newline
+    \vspace{-3mm}
+    \rule{8cm}{0.15mm}
+    \centerline{\scriptsize\it (подпись студента)}\newline
+%
+    {\bf Научный руководитель: \newline}
+    Леонидов Андрей Владимирович\newline
+    \vspace{-3mm}
+    \rule{8cm}{0.15mm}
+    \centerline{\scriptsize\it (подпись научного руководителя)}
+  \end{minipage}
+
+    \vspace*{\fill}
+    \begin{center}
+      Москва 2022
+    \end{center}
+\end{titlepage}
+}
+
+
+\pgfplotsset{compat=1.18} 
+\begin{document}
+\maketitle
+
+\newpage
+\setcounter{page}{2}
+
+\vspace*{\fill}
+\begin{abstract}
+
+Данная работа посвящена изучению  теории информации в нейронных сетях и исследованию Bottleneck Principe (принцип узкого места). В ходе работы была изучена взаимосвязь информации с алгоритмами машинного обучения на примере обучения нейронной сети классификации цифр по картинке.
+\end{abstract}
+\vspace*{\fill}
+\newpage
+\tableofcontents
+\newpage
+\include{data/problem}
+\newpage
+\include{data/papers_teory}
+\newpage
+\include{data/network}
+\newpage
+\include{data/probability}
+\newpage
+\include{data/transform}
+\newpage
+\include{data/information}
+\newpage
+\include{data/conclusion}
+\newpage
+\include{data/conclusion}
+\begin{thebibliography}{9}
+\bibitem{texbook}
+Andreas Kirsch, Clare Lyle, Yarin Gal (2021) \emph{Unpacking Information Bottlenecks: Surrogate Objectives for Deep Learning}, Department of Computer Science University of Oxford
+
+\bibitem{texbook}
+Naftali Tishby, Noga Zaslavsky (2015) \emph{Deep Learning and the Information Bottleneck Principle}
+\end{thebibliography}
+\end{document}
